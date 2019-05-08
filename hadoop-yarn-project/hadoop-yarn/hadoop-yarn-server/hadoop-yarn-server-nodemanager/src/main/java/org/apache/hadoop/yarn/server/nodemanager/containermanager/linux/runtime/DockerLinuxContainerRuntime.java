@@ -891,46 +891,60 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
 
     runCommand.setCapabilities(capabilities);
 
+    runCommand.setVolumeDriver("nfs");
+
     runCommand.addAllReadWriteMountLocations(containerLogDirs);
     runCommand.addAllReadWriteMountLocations(applicationLocalDirs);
     runCommand.addAllReadOnlyMountLocations(filecacheDirs);
     runCommand.addAllReadOnlyMountLocations(userFilecacheDirs);
 
     if (environment.containsKey(ENV_DOCKER_CONTAINER_MOUNTS)) {
-      Matcher parsedMounts = USER_MOUNT_PATTERN.matcher(
-          environment.get(ENV_DOCKER_CONTAINER_MOUNTS));
-      if (!parsedMounts.find()) {
-        throw new ContainerExecutionException(
-            "Unable to parse user supplied mount list: "
-                + environment.get(ENV_DOCKER_CONTAINER_MOUNTS));
-      }
-      parsedMounts.reset();
-      long mountCount = 0;
-      while (parsedMounts.find()) {
-        mountCount++;
-        String src = parsedMounts.group(1);
-        java.nio.file.Path srcPath = java.nio.file.Paths.get(src);
-        if (!srcPath.isAbsolute()) {
-          src = mountReadOnlyPath(src, localizedResources);
+      String mounts = environment.get(ENV_DOCKER_CONTAINER_MOUNTS);
+      String[] mountsArray = mounts.split(",");
+      for (int i=0; i<mountsArray.length; i++) {
+        String mount = mountsArray[i];
+        String[] details = mount.split(":");
+        if (details.length < 2) {
+          continue;
+        } else if (details.length == 2) {
+          runCommand.addMountLocation(details[0], details[1], "rw");
+        } else if (details.length == 3) {
+          runCommand.addMountLocation(details[0], details[1], details[2]);
         }
-        String dst = parsedMounts.group(2);
-        String mode = parsedMounts.group(4);
-        if (mode == null) {
-          mode = "rw";
-        } else if (!mode.startsWith("ro") && !mode.startsWith("rw")) {
-          mode = "rw+" + mode;
-        }
-        runCommand.addMountLocation(src, dst, mode);
-      }
-      long commaCount = environment.get(ENV_DOCKER_CONTAINER_MOUNTS).chars()
-          .filter(c -> c == ',').count();
-      if (mountCount != commaCount + 1) {
-        // this means the matcher skipped an improperly formatted mount
-        throw new ContainerExecutionException(
-            "Unable to parse some mounts in user supplied mount list: "
-                + environment.get(ENV_DOCKER_CONTAINER_MOUNTS));
       }
     }
+//
+//    if (environment.containsKey(ENV_DOCKER_CONTAINER_MOUNTS)) {
+//      Matcher parsedMounts = USER_MOUNT_PATTERN.matcher(
+//          environment.get(ENV_DOCKER_CONTAINER_MOUNTS));
+//      if (!parsedMounts.find()) {
+//        throw new ContainerExecutionException(
+//            "Unable to parse user supplied mount list: "
+//                + environment.get(ENV_DOCKER_CONTAINER_MOUNTS));
+//      }
+//      parsedMounts.reset();
+//      long mountCount = 0;
+//      while (parsedMounts.find()) {
+//        mountCount++;
+//        String src = parsedMounts.group(1);
+//        String dst = parsedMounts.group(2);
+//        String mode = parsedMounts.group(4);
+//        if (mode == null) {
+//          mode = "rw";
+//        } else if (!mode.startsWith("ro") && !mode.startsWith("rw")) {
+//          mode = "rw+" + mode;
+//        }
+//        runCommand.addMountLocation(src, dst, mode);
+//      }
+//      long commaCount = environment.get(ENV_DOCKER_CONTAINER_MOUNTS).chars()
+//          .filter(c -> c == ',').count();
+//      if (mountCount != commaCount + 1) {
+//        // this means the matcher skipped an improperly formatted mount
+//        throw new ContainerExecutionException(
+//            "Unable to parse some mounts in user supplied mount list: "
+//                + environment.get(ENV_DOCKER_CONTAINER_MOUNTS));
+//      }
+//    }
 
     if(defaultROMounts != null && !defaultROMounts.isEmpty()) {
       for (String mount : defaultROMounts) {

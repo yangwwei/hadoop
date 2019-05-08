@@ -162,9 +162,10 @@ static int is_valid_tmpfs_mount(const char *mount) {
 }
 
 static int is_volume_name(const char *volume_name) {
-  const char *regex_str = "^[a-zA-Z0-9]([a-zA-Z0-9_.-]*)$";
+  // const char *regex_str = "^[a-zA-Z0-9]([a-zA-Z0-9_.-]*)$";
   // execute_regex_match return 0 is matched success
-  return execute_regex_match(regex_str, volume_name) == 0;
+  // return execute_regex_match(regex_str, volume_name) == 0;
+  return 0;
 }
 
 static int is_valid_ports_mapping(const char *ports_mapping) {
@@ -176,7 +177,8 @@ static int is_valid_ports_mapping(const char *ports_mapping) {
 
 static int is_volume_name_matched_by_regex(const char* requested, const char* pattern) {
   // execute_regex_match return 0 is matched success
-  return is_volume_name(requested) && (execute_regex_match(pattern + sizeof("regex:"), requested) == 0);
+  // return is_volume_name(requested) && (execute_regex_match(pattern + sizeof("regex:"), requested) == 0);
+  return 0;
 }
 
 static int add_param_to_command_if_allowed(const struct configuration *command_config,
@@ -1276,67 +1278,78 @@ static int add_mounts(const struct configuration *command_config, const struct c
     ret = 0;
     goto free_and_exit;
   }
-  ret = normalize_mounts(permitted_ro_mounts, 1);
-  ret |= normalize_mounts(permitted_rw_mounts, 1);
+//  ret = normalize_mounts(permitted_ro_mounts, 1);
+//  ret |= normalize_mounts(permitted_rw_mounts, 1);
+//  if (ret != 0) {
+//    fprintf(ERRORFILE, "Unable to find permitted docker mounts on disk\n");
+//    ret = MOUNT_ACCESS_ERROR;
+//    goto free_and_exit;
+//  }
+
+///////////////////////////////////////////////
+//  tmp solution: add volume driver here
+///////////////////////////////////////////////
+
+  ret = add_to_args(args, "--volume-driver=nfs");
   if (ret != 0) {
-    fprintf(ERRORFILE, "Unable to find permitted docker mounts on disk\n");
-    ret = MOUNT_ACCESS_ERROR;
+    ret = BUFFER_TOO_SMALL;
     goto free_and_exit;
   }
-  for (i = 0; values[i] != NULL; i++) {
-    mount_src = get_mount_source(values[i]);
-    if (mount_src == NULL) {
-      fprintf(ERRORFILE, "Invalid docker mount '%s'\n", values[i]);
-      ret = INVALID_DOCKER_MOUNT;
-      goto free_and_exit;
-    }
-    mount_type = get_mount_type(values[i]);
-    if (mount_type == NULL) {
-      fprintf(ERRORFILE, "Invalid docker mount '%s'\n", values[i]);
-      ret = INVALID_DOCKER_MOUNT;
-      goto free_and_exit;
-    }
-    permitted_rw = check_mount_permitted((const char **) permitted_rw_mounts, mount_src);
-    permitted_ro = check_mount_permitted((const char **) permitted_ro_mounts, mount_src);
-    if (permitted_ro == -1 || permitted_rw == -1) {
-      fprintf(ERRORFILE, "Invalid docker mount '%s', realpath=%s\n", values[i], mount_src);
-      ret = INVALID_DOCKER_MOUNT;
-      goto free_and_exit;
-    }
-    if (strncmp("rw", mount_type, 2) == 0) {
-      // rw mount
-      if (permitted_rw == 0) {
-        fprintf(ERRORFILE, "Configuration does not allow docker mount '%s', realpath=%s\n", values[i], mount_src);
-        ret = INVALID_DOCKER_RW_MOUNT;
-        goto free_and_exit;
-      } else {
-        // determine if the user can modify the container-executor.cfg file
-        tmp_path_buffer[0] = normalize_mount(mount_src, 0);
-        // just re-use the function, flip the args to check if the container-executor path is in the requested
-        // mount point
-        ret = check_mount_permitted(tmp_path_buffer, container_executor_cfg_path);
-        free((void *) tmp_path_buffer[0]);
-        if (ret == 1) {
-          fprintf(ERRORFILE, "Attempting to mount a parent directory '%s' of container-executor.cfg as read-write\n",
-                  values[i]);
-          ret = INVALID_DOCKER_RW_MOUNT;
-          goto free_and_exit;
-        }
-      }
-    } else {
-      // ro mount
-      if (permitted_ro == 0 && permitted_rw == 0) {
-        fprintf(ERRORFILE, "Configuration does not allow docker mount '%s', realpath=%s\n", values[i], mount_src);
-        ret = INVALID_DOCKER_RO_MOUNT;
-        goto free_and_exit;
-      }
-    }
 
-    if (strlen(mount_type) > 2) {
-      // overwrite separator between read mode and propagation option with ','
-      int mount_type_index = strlen(values[i]) - strlen(mount_type);
-      values[i][mount_type_index + 2] = ',';
-    }
+  for (i = 0; values[i] != NULL; i++) {
+//    mount_src = get_mount_source(values[i]);
+//    if (mount_src == NULL) {
+//      fprintf(ERRORFILE, "Invalid docker mount '%s'\n", values[i]);
+//      ret = INVALID_DOCKER_MOUNT;
+//      goto free_and_exit;
+//    }
+//    mount_type = get_mount_type(values[i]);
+//    if (mount_type == NULL) {
+//      fprintf(ERRORFILE, "Invalid docker mount '%s'\n", values[i]);
+//      ret = INVALID_DOCKER_MOUNT;
+//      goto free_and_exit;
+//    }
+//    permitted_rw = check_mount_permitted((const char **) permitted_rw_mounts, mount_src);
+//    permitted_ro = check_mount_permitted((const char **) permitted_ro_mounts, mount_src);
+//    if (permitted_ro == -1 || permitted_rw == -1) {
+//      fprintf(ERRORFILE, "Invalid docker mount '%s', realpath=%s\n", values[i], mount_src);
+//      ret = INVALID_DOCKER_MOUNT;
+//      goto free_and_exit;
+//    }
+//    if (strncmp("rw", mount_type, 2) == 0) {
+//      // rw mount
+//      if (permitted_rw == 0) {
+//        fprintf(ERRORFILE, "Configuration does not allow docker mount '%s', realpath=%s\n", values[i], mount_src);
+//        ret = INVALID_DOCKER_RW_MOUNT;
+//        goto free_and_exit;
+//      } else {
+//        // determine if the user can modify the container-executor.cfg file
+//        tmp_path_buffer[0] = normalize_mount(mount_src, 0);
+//        // just re-use the function, flip the args to check if the container-executor path is in the requested
+//        // mount point
+//        ret = check_mount_permitted(tmp_path_buffer, container_executor_cfg_path);
+//        free((void *) tmp_path_buffer[0]);
+//        if (ret == 1) {
+//          fprintf(ERRORFILE, "Attempting to mount a parent directory '%s' of container-executor.cfg as read-write\n",
+//                  values[i]);
+//          ret = INVALID_DOCKER_RW_MOUNT;
+//          goto free_and_exit;
+//        }
+//      }
+//    } else {
+//      // ro mount
+//      if (permitted_ro == 0 && permitted_rw == 0) {
+//        fprintf(ERRORFILE, "Configuration does not allow docker mount '%s', realpath=%s\n", values[i], mount_src);
+//        ret = INVALID_DOCKER_RO_MOUNT;
+//        goto free_and_exit;
+//      }
+//    }
+//
+//    if (strlen(mount_type) > 2) {
+//      // overwrite separator between read mode and propagation option with ','
+//      int mount_type_index = strlen(values[i]) - strlen(mount_type);
+//      values[i][mount_type_index + 2] = ',';
+//    }
 
     ret = add_to_args(args, "-v");
     if (ret != 0) {
@@ -1349,10 +1362,10 @@ static int add_mounts(const struct configuration *command_config, const struct c
       ret = BUFFER_TOO_SMALL;
       goto free_and_exit;
     }
-    free(mount_src);
-    free(mount_type);
-    mount_src = NULL;
-    mount_type = NULL;
+//    free(mount_src);
+//    free(mount_type);
+//    mount_src = NULL;
+//    mount_type = NULL;
   }
 
 free_and_exit:
